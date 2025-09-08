@@ -250,6 +250,11 @@ def update_wiki_space_from_folder(settings_name, folder_name=None):
 def sync_wiki_page_to_markdown(doc, method=None):
 	"""Hook function: Automatically sync wiki page changes to markdown files"""
 	try:
+		# Add small delay to ensure sidebar changes are saved first
+		import time
+		if method == "after_insert":
+			time.sleep(0.5)  # Brief delay for sidebar to be saved
+		
 		# Find settings that match this wiki page's app
 		all_settings = frappe.get_all("Wiki Dev Settings", 
 			filters={"enabled": 1, "sync_on_wiki_update": 1},
@@ -276,16 +281,16 @@ def sync_wiki_page_to_markdown(doc, method=None):
 					
 					# Check if this page belongs to this wiki space
 					if wiki_space_route and doc.route.startswith(f"{wiki_space_route}/"):
-						# First try to find existing page in config
-						synced = sync_existing_page(doc, config, item_path, settings, wiki_space_route)
+						# First check if page exists in config with wrong parent and move it
+						synced = sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_space_route)
+						
+						# Then try to find existing page in config
+						if not synced:
+							synced = sync_existing_page(doc, config, item_path, settings, wiki_space_route)
 						
 						# If not found, handle as new page
 						if not synced:
 							synced = sync_new_page(doc, config, item_path, settings, config_path, wiki_space_route)
-							
-						# Additional check: if page exists in config with wrong parent, move it
-						if not synced:
-							synced = sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_space_route)
 						
 						if synced:
 							return
@@ -309,6 +314,82 @@ def sync_wiki_space_sidebar_changes(doc, method=None):
 					
 	except Exception as e:
 		frappe.log_error(f"Wiki Space Sidebar Sync Error: {str(e)}", "Wiki Sidebar Sync Error")
+
+
+def check_and_fix_misplaced_pages():
+	"""Scheduled task: Check for pages that are in wrong groups and fix them"""
+	try:
+		# Get all enabled settings
+		settings_list = frappe.get_all("Wiki Dev Settings", 
+			filters={"enabled": 1, "sync_on_wiki_update": 1},
+			fields=["name"]
+		)
+		
+		if not settings_list:
+			return
+		
+		for setting_data in settings_list:
+			settings = frappe.get_doc("Wiki Dev Settings", setting_data.name)
+			docs_path = settings.get_full_docs_path()
+			
+			if not docs_path or not os.path.exists(docs_path):
+				continue
+			
+			# Check each wiki space folder
+			for item in os.listdir(docs_path):
+				item_path = os.path.join(docs_path, item)
+				config_path = os.path.join(item_path, "_config.json")
+				
+				if os.path.isdir(item_path) and os.path.exists(config_path):
+					with open(config_path, 'r') as f:
+						config = json.load(f)
+					
+					wiki_space_route = config.get("wiki_space", {}).get("route")
+					if not wiki_space_route:
+						continue
+					
+					# Find wiki space
+					wiki_spaces = frappe.get_all("Wiki Space", filters={"route": wiki_space_route}, limit=1)
+					if not wiki_spaces:
+						continue
+					
+					wiki_space = frappe.get_doc("Wiki Space", wiki_spaces[0].name)
+					
+					# Check each page in the sidebar
+					pages_fixed = 0
+					for sidebar_item in wiki_space.wiki_sidebars:
+						if not sidebar_item.wiki_page:
+							continue
+						
+						try:
+							page = frappe.get_doc("Wiki Page", sidebar_item.wiki_page)
+							current_parent = sidebar_item.parent_label
+							
+							# Check if page is in wrong group in config
+							page_in_wrong_group = False
+							for group in config.get("groups", []):
+								for page_config in group.get("pages", []):
+									if page_config.get("route") == page.route and group.get("name") != current_parent:
+										page_in_wrong_group = True
+										break
+								if page_in_wrong_group:
+									break
+							
+							# Fix misplaced page
+							if page_in_wrong_group:
+								synced = sync_misplaced_page(page, config, item_path, settings, config_path, wiki_space_route)
+								if synced:
+									pages_fixed += 1
+							
+						except Exception as page_error:
+							frappe.log_error(f"Error fixing page {sidebar_item.wiki_page}: {str(page_error)}", "Wiki Misplaced Page Fix")
+							continue
+					
+					if pages_fixed > 0:
+						print(f"Wiki Sync: Fixed {pages_fixed} misplaced pages in {wiki_space_route}")
+						
+	except Exception as e:
+		frappe.log_error(f"Wiki Misplaced Page Check Error: {str(e)}", "Wiki Misplaced Page Check")
 
 
 def sync_existing_page(doc, config, item_path, settings, wiki_space_route=None):

@@ -2,7 +2,9 @@
 
 **Bi-directional Wiki Synchronization for Frappe Apps**
 
-Automatically sync markdown files in your app's `/docs` folder with Frappe Wiki Pages. Supports folder-based organization with complete bi-directional sync.
+Developer tooling that extends the Frappe Wiki app to automatically sync markdown files in your app's `/docs` folder with Wiki Pages. Supports folder-based organization with complete bi-directional sync.
+
+> **Note**: This app requires the Frappe Wiki app to be installed first as it extends its functionality.
 
 ## Features
 
@@ -16,7 +18,14 @@ Automatically sync markdown files in your app's `/docs` folder with Frappe Wiki 
 ## Quick Start
 
 ### 1. Install
+**Prerequisites**: Frappe Wiki app must be installed first.
+
 ```bash
+# Install Wiki app if not already installed
+bench get-app wiki
+bench install-app wiki
+
+# Install Wiki Dev
 bench get-app $URL_OF_THIS_REPO --branch develop
 bench install-app wiki_dev
 ```
@@ -92,17 +101,18 @@ after_migrate = [
 - **Markdown → Wiki**: During migration, markdown files sync to Wiki Pages
 - **Wiki → Markdown**: UI edits automatically update markdown files
 - **File Uploads**: Images move from private to public assets automatically
+- **Auto-Fix Misplaced Pages**: Scheduled task (every 5 minutes) fixes pages in wrong folders
 
 ## Configuration Reference
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| **App Name** | Target app | `emr_plus` |
+| **App Name** | Target app | `my_app` |
 | **Wiki Space Name** | Folder with `_config.json` | `docs` |
-| **Docs Folder Path** | Base docs path | `apps/emr_plus/docs` |
+| **Docs Folder Path** | Base docs path | `apps/my_app/docs` |
 | **Wiki Route Prefix** | URL prefix | `docs` → `/docs/page` |
-| **File Upload Path** | Upload destination | `apps/emr_plus/public/docs/images` |
-| **Public Assets Path** | Public URL path | `/assets/emr_plus/docs` |
+| **File Upload Path** | Upload destination | `apps/my_app/public/docs/images` |
+| **Public Assets Path** | Public URL path | `/assets/my_app/docs` |
 
 ## Advanced Usage
 
@@ -131,6 +141,12 @@ bench --site your_site execute wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_
 1. Check Wiki Dev Settings is enabled with `sync_on_migrate` checked
 2. Verify `_config.json` exists and is valid JSON
 3. Ensure markdown files exist at specified paths
+
+**Pages created in GUI end up in "Miscellaneous" folder?**
+1. This is normal for new pages - they start in Miscellaneous
+2. Move the page to correct parent label in Wiki Space sidebar
+3. Wait up to 5 minutes for the scheduled task to fix the placement
+4. Or manually run: `bench execute wiki_dev.wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages`
 
 **Files not uploading correctly?**
 1. Check `file_upload_path` directory exists

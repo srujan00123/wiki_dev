@@ -1,14 +1,14 @@
 app_name = "wiki_dev"
 app_title = "Wiki Dev"
 app_publisher = "srujan.00123@gmail.com"
-app_description = "wiki dev helps have code sync for an app configured under /docs folder"
+app_description = "Developer tooling for Frappe Wiki app - enables bi-directional sync between markdown files and wiki pages"
 app_email = "srujan.00123@gmail.com"
 app_license = "mit"
 
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["wiki"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -85,8 +85,8 @@ app_license = "mit"
 # Installation
 # ------------
 
-# before_install = "wiki_dev.install.before_install"
-# after_install = "wiki_dev.install.after_install"
+before_install = "wiki_dev.install.before_install"
+after_install = "wiki_dev.install.after_install"
 
 # Uninstallation
 # ------------
@@ -149,29 +149,22 @@ doc_events = {
 		"on_update": [
 			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
 		],
+		"after_insert": [
+			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
+		],
 	},
 }
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"wiki_dev.tasks.all"
-# 	],
-# 	"daily": [
-# 		"wiki_dev.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"wiki_dev.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"wiki_dev.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"wiki_dev.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [  # Every 5 minutes
+			"wiki_dev.wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages"
+		]
+	}
+}
 
 # Testing
 # -------

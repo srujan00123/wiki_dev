@@ -17,7 +17,7 @@ doc_events = {
 }
 '''
         
-        # Get the path where we would write (using emr_plus path as example)
+        # Get the path where we would write (using example app path)
         settings = frappe.get_doc("Wiki Dev Settings", "WDS-00001")
         hooks_path = settings.get_app_hooks_path()
         

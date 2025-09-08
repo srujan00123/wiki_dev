@@ -70,27 +70,27 @@
    "label": "Enabled"
   },
   {
-   "description": "Local folder path where markdown files are stored\nExample: apps/emr_plus/docs/docs\nExample: apps/crm/docs/crm-docs",
+   "description": "Local folder path where markdown files are stored\nExample: apps/my_app/docs/docs\nExample: apps/crm/docs/crm-docs",
    "fieldname": "docs_folder_path",
    "fieldtype": "Data",
    "label": "Docs Folder Path",
    "reqd": 1
   },
   {
-   "description": "URL prefix for wiki pages\nExample: docs (creates routes like /docs/getting-started)\nExample: emr-docs (creates routes like /emr-docs/configuration)",
+   "description": "URL prefix for wiki pages\nExample: docs (creates routes like /docs/getting-started)\nExample: user-guide (creates routes like /user-guide/configuration)",
    "fieldname": "wiki_route_prefix",
    "fieldtype": "Data",
    "label": "Wiki Route Prefix",
    "reqd": 1
   },
   {
-   "description": "Path where uploaded images/files are stored\nExample: apps/emr_plus/public/docs/images\nExample: apps/crm/public/assets/wiki-images",
+   "description": "Path where uploaded images/files are stored\nExample: apps/my_app/public/docs/images\nExample: apps/crm/public/assets/wiki-images",
    "fieldname": "file_upload_path",
    "fieldtype": "Data",
    "label": "File Upload Path"
   },
   {
-   "description": "Public URL path for accessing uploaded files\nExample: /assets/emr_plus/docs (images accessible at /assets/emr_plus/docs/images/file.jpg)\nExample: /assets/crm/wiki (images accessible at /assets/crm/wiki/images/file.jpg)",
+   "description": "Public URL path for accessing uploaded files\nExample: /assets/my_app/docs (images accessible at /assets/my_app/docs/images/file.jpg)\nExample: /assets/crm/wiki (images accessible at /assets/crm/wiki/images/file.jpg)",
    "fieldname": "public_assets_path",
    "fieldtype": "Data",
    "label": "Public Assets Path"
