@@ -1,0 +1,145 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-09-08 06:09:40.558116",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "section_break_tbkv",
+  "app_name",
+  "wiki_space_name",
+  "enabled",
+  "docs_folder_path",
+  "wiki_route_prefix",
+  "file_upload_path",
+  "public_assets_path",
+  "use_parent_label_folders",
+  "sync_on_migrate",
+  "sync_on_wiki_update",
+  "auto_publish_pages",
+  "create_missing_folders"
+ ],
+ "fields": [
+  {
+   "default": "WDS-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "WDS-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_tbkv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "app_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "App Name",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Automatically create missing directories when syncing files\nUseful when wiki edits create new file paths",
+   "fieldname": "create_missing_folders",
+   "fieldtype": "Check",
+   "label": "Create Missing Folders"
+  },
+  {
+   "default": "1",
+   "description": "Automatically publish wiki pages when created from markdown\nUncheck to create draft pages that need manual publishing",
+   "fieldname": "auto_publish_pages",
+   "fieldtype": "Check",
+   "label": "Auto Publish Pages",
+   "reqd": 1
+  },
+  {
+   "description": "Name of the wiki space folder\nExample: docs, user-guide, api-reference",
+   "fieldname": "wiki_space_name",
+   "fieldtype": "Data",
+   "label": "Wiki Space Name"
+  },
+  {
+   "default": "1",
+   "description": "Enable/disable this wiki sync configuration",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "description": "Local folder path where markdown files are stored\nExample: apps/emr_plus/docs/docs\nExample: apps/crm/docs/crm-docs",
+   "fieldname": "docs_folder_path",
+   "fieldtype": "Data",
+   "label": "Docs Folder Path",
+   "reqd": 1
+  },
+  {
+   "description": "URL prefix for wiki pages\nExample: docs (creates routes like /docs/getting-started)\nExample: emr-docs (creates routes like /emr-docs/configuration)",
+   "fieldname": "wiki_route_prefix",
+   "fieldtype": "Data",
+   "label": "Wiki Route Prefix",
+   "reqd": 1
+  },
+  {
+   "description": "Path where uploaded images/files are stored\nExample: apps/emr_plus/public/docs/images\nExample: apps/crm/public/assets/wiki-images",
+   "fieldname": "file_upload_path",
+   "fieldtype": "Data",
+   "label": "File Upload Path"
+  },
+  {
+   "description": "Public URL path for accessing uploaded files\nExample: /assets/emr_plus/docs (images accessible at /assets/emr_plus/docs/images/file.jpg)\nExample: /assets/crm/wiki (images accessible at /assets/crm/wiki/images/file.jpg)",
+   "fieldname": "public_assets_path",
+   "fieldtype": "Data",
+   "label": "Public Assets Path"
+  },
+  {
+   "default": "1",
+   "description": "Create folder hierarchy in wiki sidebar using groups from _config.json\nExample: Groups 'Basics' and 'Advanced' become sidebar folders",
+   "fieldname": "use_parent_label_folders",
+   "fieldtype": "Check",
+   "label": "Use Parent Label Folders"
+  },
+  {
+   "default": "1",
+   "description": "Run wiki sync automatically during 'bench migrate'\nSyncs markdown files to wiki pages after app updates",
+   "fieldname": "sync_on_migrate",
+   "fieldtype": "Check",
+   "label": "Sync On Migrate"
+  },
+  {
+   "default": "1",
+   "description": "Auto-sync changes from wiki pages back to markdown files\nBi-directional sync: wiki edits update source markdown files",
+   "fieldname": "sync_on_wiki_update",
+   "fieldtype": "Check",
+   "label": "Sync On Wiki Update"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-09-08 06:11:55.810928",
+ "modified_by": "Administrator",
+ "module": "Wiki Dev",
+ "name": "Wiki Dev Settings",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

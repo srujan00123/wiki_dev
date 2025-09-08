@@ -132,13 +132,25 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Wiki Page": {
+		"after_insert": [
+			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_page_to_markdown",
+		],
+		"on_update": [
+			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_page_to_markdown",
+			"wiki_dev.wiki_dev.api.wiki_file_handler.auto_process_wiki_page_files"
+		],
+		"on_trash": [
+			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_page_deletion_to_markdown",
+		],
+	},
+	"Wiki Space": {
+		"on_update": [
+			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
+		],
+	},
+}
 
 # Scheduled Tasks
 # ---------------
