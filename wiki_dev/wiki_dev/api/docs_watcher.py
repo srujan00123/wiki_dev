@@ -57,7 +57,8 @@ def sync_single_docs_folder(item_path, config_path, settings):
 			pages_to_keep = []
 			
 			for page_config in group.get("pages", []):
-				file_path = os.path.join(item_path, "..", page_config.get("file", ""))
+				# File paths in config are relative to wiki space folder
+				file_path = os.path.join(item_path, page_config.get("file", ""))
 				
 				# If markdown file doesn't exist, remove corresponding wiki page
 				if not os.path.exists(file_path):
@@ -170,7 +171,8 @@ def check_orphaned_wiki_pages(settings_name=None):
 						for group in config.get("groups", []):
 							for page_config in group.get("pages", []):
 								if page_config.get("route") == page.route:
-									file_path = os.path.join(item_path, "..", page_config.get("file", ""))
+									# File paths in config are relative to wiki space folder
+									file_path = os.path.join(item_path, page_config.get("file", ""))
 									if not os.path.exists(file_path):
 										orphaned_pages.append({
 											"name": page.name,

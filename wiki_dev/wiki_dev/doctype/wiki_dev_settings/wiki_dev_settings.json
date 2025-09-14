@@ -12,7 +12,6 @@
   "wiki_space_name",
   "enabled",
   "docs_folder_path",
-  "wiki_route_prefix",
   "file_upload_path",
   "public_assets_path",
   "use_parent_label_folders",
@@ -74,13 +73,6 @@
    "fieldname": "docs_folder_path",
    "fieldtype": "Data",
    "label": "Docs Folder Path",
-   "reqd": 1
-  },
-  {
-   "description": "URL prefix for wiki pages\nExample: docs (creates routes like /docs/getting-started)\nExample: user-guide (creates routes like /user-guide/configuration)",
-   "fieldname": "wiki_route_prefix",
-   "fieldtype": "Data",
-   "label": "Wiki Route Prefix",
    "reqd": 1
   },
   {

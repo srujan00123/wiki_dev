@@ -88,6 +88,13 @@ required_apps = ["wiki"]
 before_install = "wiki_dev.install.before_install"
 after_install = "wiki_dev.install.after_install"
 
+# Migrations
+# ------------
+
+after_migrate = [
+	"wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings"  # Sync wiki docs on migration
+]
+
 # Uninstallation
 # ------------
 

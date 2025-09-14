@@ -40,9 +40,6 @@ class WikiDevSettings(Document):
 			if not self.docs_folder_path:
 				self.docs_folder_path = f"apps/{self.app_name}/docs/{self.wiki_space_name}"
 			
-			# Set default wiki_route_prefix if not provided
-			if not self.wiki_route_prefix:
-				self.wiki_route_prefix = self.wiki_space_name.replace('_', '-')
 			
 			# Set default file_upload_path if not provided
 			if not self.file_upload_path:
@@ -106,8 +103,8 @@ class WikiDevSettings(Document):
 		"""Get all enabled Wiki Dev Settings"""
 		return frappe.get_all("Wiki Dev Settings", 
 			filters={"enabled": 1},
-			fields=["name", "app_name", "wiki_space_name", "docs_folder_path", 
-					"wiki_route_prefix", "sync_on_migrate", "sync_on_wiki_update"]
+			fields=["name", "app_name", "wiki_space_name", "docs_folder_path",
+					"sync_on_migrate", "sync_on_wiki_update"]
 		)
 
 	def add_wiki_sync_hook(self):

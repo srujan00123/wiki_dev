@@ -1,160 +1,82 @@
 # Wiki Dev
 
-**Bi-directional Wiki Synchronization for Frappe Apps**
+Bi-directional sync between markdown files and Frappe Wiki pages.
 
-Developer tooling that extends the Frappe Wiki app to automatically sync markdown files in your app's `/docs` folder with Wiki Pages. Supports folder-based organization with complete bi-directional sync.
-
-> **Note**: This app requires the Frappe Wiki app to be installed first as it extends its functionality.
+**Prerequisites**: Frappe Wiki app must be installed first.
 
 ## Features
 
-- ✅ **Auto Migration Sync**: Updates during `bench migrate`
-- ✅ **Bi-directional Sync**: Markdown ↔ Wiki Pages
-- ✅ **Multi-app Support**: Configure multiple apps independently
-- ✅ **Auto Hook Management**: Automatically adds migration hooks
-- ✅ **GUI Configuration**: Easy setup through Wiki Dev Settings
-- ✅ **Smart File Handling**: Automatic file upload processing
+- Auto sync during migration
+- Edit in markdown OR wiki interface
+- Organized sidebar with groups
+- Smart file handling for uploads
 
-## Quick Start
+## Setup
 
 ### 1. Install
-**Prerequisites**: Frappe Wiki app must be installed first.
-
 ```bash
-# Install Wiki app if not already installed
-bench get-app wiki
-bench install-app wiki
-
-# Install Wiki Dev
+bench get-app wiki && bench install-app wiki
 bench get-app $URL_OF_THIS_REPO --branch develop
 bench install-app wiki_dev
 ```
 
-### 2. Configure
-Create **Wiki Dev Settings** record:
-- **App Name**: `your_app_name`
-- **Wiki Space Name**: `docs`
-- **Enabled**: ✅
-- **Sync On Migrate**: ✅
-- **Auto Publish Pages**: ✅
-
-### 3. Create Structure
+### 2. Create docs structure
 ```
-apps/your_app_name/
-├── docs/
-│   └── docs/
-│       ├── _config.json
-│       ├── basics/
-│       │   ├── getting-started.md
-│       │   └── user-guide.md
-│       └── advanced/
-│           └── configuration.md
-└── public/
-    └── docs/
-        └── images/
+apps/your_app/your_app/docs/docs/
+├── _config.json
+├── getting-started.md
+└── user-guide.md
 ```
 
-### 4. Create _config.json
+### 3. Create _config.json
 ```json
 {
   "wiki_space": {
     "route": "docs",
-    "title": "My Documentation",
-    "description": "App documentation"
+    "title": "Documentation"
   },
-  "groups": [
-    {
-      "name": "Basics",
-      "order": 1,
-      "pages": [
-        {
-          "file": "docs/basics/getting-started.md",
-          "title": "Getting Started",
-          "route": "docs/getting-started",
-          "order": 1
-        }
-      ]
-    }
-  ]
+  "groups": [{
+    "name": "Guide",
+    "pages": [{
+      "file": "getting-started.md",
+      "title": "Getting Started",
+      "route": "docs/getting-started"
+    }]
+  }]
 }
 ```
 
-### 5. Run Migration
+### 4. Create Wiki Dev Settings
+- **App Name**: `your_app`
+- **Wiki Space Name**: `docs`
+- **Docs Folder Path**: `apps/your_app/your_app/docs`
+- Enable sync options
+```
+
+### 5. Run migration
 ```bash
 bench --site your_site migrate
 ```
 
-**Done!** Your wiki pages are now accessible at `/docs/getting-started`, `/docs/user-guide`, etc.
+Pages accessible at `/docs/getting-started`
 
-## How It Works
+## Manual Commands
 
-### Auto Hook Management
-When **Sync On Migrate** is enabled, the system automatically adds this to your app's `hooks.py`:
-
-```python
-after_migrate = [
-    "wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings"
-]
-```
-
-### Sync Flow
-- **Markdown → Wiki**: During migration, markdown files sync to Wiki Pages
-- **Wiki → Markdown**: UI edits automatically update markdown files
-- **File Uploads**: Images move from private to public assets automatically
-- **Auto-Fix Misplaced Pages**: Scheduled task (every 5 minutes) fixes pages in wrong folders
-
-## Configuration Reference
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| **App Name** | Target app | `my_app` |
-| **Wiki Space Name** | Folder with `_config.json` | `docs` |
-| **Docs Folder Path** | Base docs path | `apps/my_app/docs` |
-| **Wiki Route Prefix** | URL prefix | `docs` → `/docs/page` |
-| **File Upload Path** | Upload destination | `apps/my_app/public/docs/images` |
-| **Public Assets Path** | Public URL path | `/assets/my_app/docs` |
-
-## Advanced Usage
-
-### Multiple Wiki Spaces
-Create separate configurations for different documentation sections (e.g., user docs vs API docs).
-
-### Manual Sync
-```python
-# Sync all enabled settings
-from wiki_dev.wiki_dev.api.wiki_sync import sync_all_enabled_settings
-sync_all_enabled_settings()
-```
-
-### Debug Commands
 ```bash
-# Test sync
-bench --site your_site execute wiki_dev.wiki_dev.api.debug_recent_pages.check_recent_wiki_pages
-
 # Manual sync
 bench --site your_site execute wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings
 ```
 
 ## Troubleshooting
 
-**Pages not syncing during migration?**
-1. Check Wiki Dev Settings is enabled with `sync_on_migrate` checked
-2. Verify `_config.json` exists and is valid JSON
-3. Ensure markdown files exist at specified paths
+**No pages syncing?**
+- Check Wiki Dev Settings enabled with sync options
+- Verify `_config.json` exists and markdown files exist
+- File paths in config should be relative to wiki space folder
 
-**Pages created in GUI end up in "Miscellaneous" folder?**
-1. This is normal for new pages - they start in Miscellaneous
-2. Move the page to correct parent label in Wiki Space sidebar
-3. Wait up to 5 minutes for the scheduled task to fix the placement
-4. Or manually run: `bench execute wiki_dev.wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages`
-
-**Files not uploading correctly?**
-1. Check `file_upload_path` directory exists
-2. Verify file permissions on upload directories
-
-**Hook not added automatically?**
-1. Check target app's `hooks.py` file exists
-2. Look for errors in **Error Log** DocType
+**Pages in wrong folder?**
+- Background jobs auto-fix within minutes
+- Or run: `bench execute wiki_dev.wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages`
 
 ## License
 

@@ -75,7 +75,8 @@ def create_wiki_pages_from_folder(folder_path, wiki_space_name, settings):
 	
 	for group in config.get("groups", []):
 		for page_config in group.get("pages", []):
-			file_path = os.path.join(folder_path, "..", page_config["file"])
+			# File paths in config are relative to wiki space folder
+			file_path = os.path.join(folder_path, page_config["file"])
 			
 			if os.path.exists(file_path):
 				with open(file_path, 'r') as f:
@@ -139,6 +140,47 @@ def setup_wiki_sidebar_from_folder(folder_path, wiki_space_name, settings):
 	
 	space_doc.save()
 	return True
+
+
+@frappe.whitelist()
+def refresh_wiki_space_sidebar(settings_name, folder_name=None):
+	"""Refresh wiki space sidebar structure from config"""
+	try:
+		settings = frappe.get_doc("Wiki Dev Settings", settings_name)
+		if not settings.enabled:
+			return {"success": False, "message": "Wiki Dev Settings is disabled"}
+
+		# Use folder_name from settings if not provided
+		if not folder_name:
+			folder_name = settings.wiki_space_name
+
+		docs_path = settings.get_full_docs_path()
+		folder_path = os.path.join(docs_path, folder_name)
+		config_path = os.path.join(folder_path, "_config.json")
+
+		if not os.path.exists(config_path):
+			return {"success": False, "message": f"Configuration file not found: {config_path}"}
+
+		with open(config_path, 'r') as f:
+			config = json.load(f)
+
+		wiki_space_route = config["wiki_space"]["route"]
+
+		# Find existing wiki space
+		wiki_space = frappe.db.get_value("Wiki Space", {"route": wiki_space_route}, "name")
+		if not wiki_space:
+			return {"success": False, "message": f"Wiki space not found with route: {wiki_space_route}"}
+
+		# Update sidebar
+		setup_wiki_sidebar_from_folder(folder_path, wiki_space, settings)
+
+		return {
+			"success": True,
+			"message": f"Refreshed sidebar for wiki space '{wiki_space_route}'"
+		}
+
+	except Exception as e:
+		return {"success": False, "error": str(e)}
 
 
 @frappe.whitelist()
@@ -209,7 +251,8 @@ def update_wiki_space_from_folder(settings_name, folder_name=None):
 		# Update each page from markdown files
 		for group in config.get("groups", []):
 			for page_config in group.get("pages", []):
-				file_path = os.path.join(folder_path, "..", page_config["file"])
+				# File paths in config are relative to wiki space folder
+				file_path = os.path.join(folder_path, page_config["file"])
 				
 				if os.path.exists(file_path):
 					with open(file_path, 'r') as f:
@@ -222,7 +265,7 @@ def update_wiki_space_from_folder(settings_name, folder_name=None):
 					wiki_page_doc = frappe.db.get_value("Wiki Page", {"route": page_route}, "name")
 					if wiki_page_doc:
 						page = frappe.get_doc("Wiki Page", wiki_page_doc)
-						
+
 						# Update if content differs
 						if page.content != markdown_content:
 							page.content = markdown_content
@@ -230,6 +273,16 @@ def update_wiki_space_from_folder(settings_name, folder_name=None):
 							page.published = 1 if settings.auto_publish_pages else page.published
 							page.save()
 							updates.append(f"Updated '{page_config['title']}'")
+					else:
+						# Create new wiki page if it doesn't exist
+						wiki_page = frappe.new_doc("Wiki Page")
+						wiki_page.title = page_config["title"]
+						wiki_page.route = page_route
+						wiki_page.content = markdown_content
+						wiki_page.wiki_space = wiki_space
+						wiki_page.published = 1 if settings.auto_publish_pages else 0
+						wiki_page.insert()
+						updates.append(f"Created '{page_config['title']}'")
 		
 		# Update sidebar structure
 		setup_wiki_sidebar_from_folder(folder_path, wiki_space, settings)
@@ -250,10 +303,16 @@ def update_wiki_space_from_folder(settings_name, folder_name=None):
 def sync_wiki_page_to_markdown(doc, method=None):
 	"""Hook function: Automatically sync wiki page changes to markdown files"""
 	try:
-		# Add small delay to ensure sidebar changes are saved first
-		import time
+		# For new pages, enqueue a background job to check placement after sidebar is saved
 		if method == "after_insert":
-			time.sleep(0.5)  # Brief delay for sidebar to be saved
+			frappe.enqueue(
+				'wiki_dev.wiki_dev.api.wiki_sync.fix_page_placement_if_needed',
+				queue='short',
+				timeout=60,
+				enqueue_after_commit=True,  # Wait until transaction completes
+				doc_name=doc.name,
+				doc_route=doc.route
+			)
 		
 		# Find settings that match this wiki page's app
 		all_settings = frappe.get_all("Wiki Dev Settings", 
@@ -392,6 +451,59 @@ def check_and_fix_misplaced_pages():
 		frappe.log_error(f"Wiki Misplaced Page Check Error: {str(e)}", "Wiki Misplaced Page Check")
 
 
+def fix_page_placement_if_needed(doc_name, doc_route):
+	"""Background job: Check if a specific page needs to be moved from Miscellaneous"""
+	try:
+		# Get the page document
+		if not frappe.db.exists("Wiki Page", doc_name):
+			return
+		
+		page = frappe.get_doc("Wiki Page", doc_name)
+		
+		# Find settings that match this wiki page
+		all_settings = frappe.get_all("Wiki Dev Settings", 
+			filters={"enabled": 1, "sync_on_wiki_update": 1},
+			fields=["name", "app_name", "docs_folder_path", "wiki_space_name"]
+		)
+		
+		for setting_data in all_settings:
+			settings = frappe.get_doc("Wiki Dev Settings", setting_data.name)
+			docs_path = settings.get_full_docs_path()
+			
+			if not docs_path or not os.path.exists(docs_path):
+				continue
+			
+			# Check each wiki space folder
+			for item in os.listdir(docs_path):
+				item_path = os.path.join(docs_path, item)
+				config_path = os.path.join(item_path, "_config.json")
+				
+				if os.path.isdir(item_path) and os.path.exists(config_path):
+					with open(config_path, 'r') as f:
+						config = json.load(f)
+					
+					wiki_space_route = config.get("wiki_space", {}).get("route")
+					
+					# Check if this page belongs to this wiki space
+					if wiki_space_route and page.route.startswith(f"{wiki_space_route}/"):
+						# Try to fix misplacement
+						synced = sync_misplaced_page(page, config, item_path, settings, config_path, wiki_space_route)
+						if synced:
+							print(f"Wiki Sync: Background job fixed placement for page '{page.title}'")
+							return
+						
+						# If not misplaced, try normal sync
+						synced = sync_existing_page(page, config, item_path, settings, wiki_space_route)
+						if not synced:
+							synced = sync_new_page(page, config, item_path, settings, config_path, wiki_space_route)
+						
+						if synced:
+							return
+						
+	except Exception as e:
+		frappe.log_error(f"Background page placement fix error: {str(e)}", "Wiki Background Fix")
+
+
 def sync_existing_page(doc, config, item_path, settings, wiki_space_route=None):
 	"""Sync existing page that's already in _config.json"""
 	for group in config.get("groups", []):
@@ -407,7 +519,8 @@ def sync_existing_page(doc, config, item_path, settings, wiki_space_route=None):
 						return False
 				
 				# Sync this page back to markdown
-				file_path = os.path.join(item_path, "..", page_config["file"])
+				# File paths in config are relative to wiki space folder
+				file_path = os.path.join(item_path, page_config["file"])
 				
 				# Ensure directory exists
 				if settings.create_missing_folders:
@@ -446,32 +559,34 @@ def sync_new_page(doc, config, item_path, settings, config_path, wiki_space_rout
 	try:
 		# Extract page name from route (e.g., "docs/new-page" -> "new-page")
 		page_name = doc.route.replace(f"{wiki_space_route}/", "")
-		
+
 		# Get the parent label (sidebar group) from the Wiki Space
 		# Find the wiki space that matches this route
 		wiki_spaces = frappe.get_all("Wiki Space", filters={"route": wiki_space_route}, limit=1)
 		if not wiki_spaces:
 			return False
-		
+
 		wiki_space = frappe.get_doc("Wiki Space", wiki_spaces[0].name)
 		parent_label = None
-		
+
 		# Find the sidebar entry for this page
 		for sidebar_item in wiki_space.wiki_sidebars:
 			if sidebar_item.wiki_page == doc.name:
 				parent_label = sidebar_item.parent_label
 				break
-		
+
 		# Use "Miscellaneous" as default group if no parent label found
 		if not parent_label:
 			parent_label = "Miscellaneous"
-		
+
 		# Determine file path based on parent label
 		# Convert parent label to folder-friendly name
 		folder_name = parent_label.lower().replace(" ", "-").replace("_", "-")
 		file_name = f"{page_name}.md"
-		relative_file_path = f"docs/{folder_name}/{file_name}"
-		full_file_path = os.path.join(item_path, "..", relative_file_path)
+		# For config file: relative path from wiki space folder
+		relative_file_path = f"{folder_name}/{file_name}"
+		# For file system: absolute path
+		full_file_path = os.path.join(item_path, relative_file_path)
 		
 		# Create directory if needed
 		if settings.create_missing_folders:
@@ -544,11 +659,12 @@ def sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_spac
 			page_name = doc.route.replace(f"{wiki_space_route}/", "")
 			folder_name = current_parent_label.lower().replace(" ", "-").replace("_", "-")
 			old_file_path = page_config_to_move["file"]
-			new_file_path = f"docs/{folder_name}/{page_name}.md"
+			# For config file: relative path from wiki space folder
+			new_file_path = f"{folder_name}/{page_name}.md"
 			
 			# Move the actual file
 			old_full_path = os.path.join(item_path, "..", old_file_path)
-			new_full_path = os.path.join(item_path, "..", new_file_path)
+			new_full_path = os.path.join(item_path, new_file_path)
 			
 			# Create directory if needed
 			if settings.create_missing_folders:
@@ -688,7 +804,8 @@ def remove_page_from_config(doc, config, item_path, config_path):
 			for i, page_config in enumerate(pages):
 				if page_config.get("route") == doc.route:
 					# Found the page to remove
-					file_path = os.path.join(item_path, "..", page_config["file"])
+					# File paths in config are relative to wiki space folder
+					file_path = os.path.join(item_path, page_config["file"])
 					pages.pop(i)
 					page_found = True
 					break

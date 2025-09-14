@@ -30,13 +30,13 @@ def process_wiki_file_uploads(wiki_page_name, settings_name=None):
 			# Try to find settings by wiki space
 			if page.wiki_space:
 				wiki_space_doc = frappe.get_doc("Wiki Space", page.wiki_space)
-				# Find settings that match this wiki space route
-				all_settings = frappe.get_all("Wiki Dev Settings", 
+				# Find settings that match this wiki space route (now matches directly with wiki_space_name)
+				all_settings = frappe.get_all("Wiki Dev Settings",
 					filters={"enabled": 1},
-					fields=["name", "wiki_route_prefix"]
+					fields=["name", "wiki_space_name"]
 				)
 				for setting_data in all_settings:
-					if wiki_space_doc.route.startswith(setting_data.wiki_route_prefix):
+					if wiki_space_doc.route == setting_data.wiki_space_name:
 						settings = frappe.get_doc("Wiki Dev Settings", setting_data.name)
 						break
 		
@@ -184,8 +184,9 @@ def sync_wiki_to_markdown(settings_name, folder_name=None):
 				wiki_page_doc = frappe.db.get_value("Wiki Page", {"route": page_route}, "name")
 				if wiki_page_doc:
 					page = frappe.get_doc("Wiki Page", wiki_page_doc)
-					
-					file_path = os.path.join(folder_path, "..", page_config["file"])
+
+					# File paths in config are relative to wiki space folder
+					file_path = os.path.join(folder_path, page_config["file"])
 					
 					# Read current markdown file
 					current_content = ""
