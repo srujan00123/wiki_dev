@@ -26,17 +26,30 @@ bench install-app wiki_dev
 ```
 
 ### 2. Create docs structure (Auto-Discovery)
+
+**Folder Structure Rules:**
+- **Root folder**: `apps/your_app/your_app/docs/{wiki_space_name}/`
+- **Groups (Sidebar folders)**: Use subfolders - each subfolder becomes a sidebar group
+- **Pages**: Markdown files inside group folders
+- **Ordering**: Use `[n]name` notation for explicit order (e.g., `[1]getting-started/`)
+
 ```
 apps/your_app/your_app/docs/docs/
 ├── _config.json                 # Minimal config
-├── [1]getting-started/          # Preserved: actual folder name
-│   ├── [1]overview.md          # Preserved: actual file → route: docs/overview
-│   └── [2]installation.md      # Preserved: actual file → route: docs/installation
-├── [2]user-guide/              # Preserved: actual folder name
-│   └── basics.md               # Preserved: actual file → route: docs/basics
-└── misc/                       # Preserved: actual folder name
-    └── faq.md                  # Preserved: actual file → route: docs/faq
+├── [1]getting-started/          # Group: "Getting Started" (order 1)
+│   ├── [1]overview.md          # Page: "Overview" → route: docs/overview
+│   └── [2]installation.md      # Page: "Installation" → route: docs/installation
+├── [2]user-guide/              # Group: "User Guide" (order 2)
+│   └── basics.md               # Page: "Basics" → route: docs/basics
+└── misc/                       # Group: "Misc" (auto-order)
+    └── faq.md                  # Page: "Faq" → route: docs/faq
 ```
+
+**Ordering Rules:**
+- `[n]` sets explicit order (1, 2, 3...)
+- Without brackets: auto-ordered alphabetically after numbered items
+- Folders become sidebar groups with `parent_label`
+- Files become pages under their folder's group
 
 ### 3. Create minimal _config.json
 ```json

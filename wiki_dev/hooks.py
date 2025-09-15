@@ -165,13 +165,13 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-scheduler_events = {
-	"cron": {
-		"*/5 * * * *": [  # Every 5 minutes
-			"wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages"
-		]
-	}
-}
+# scheduler_events = {
+# 	"cron": {
+# 		"*/5 * * * *": [  # Every 5 minutes
+# 			"wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages"
+# 		]
+# 	}
+# }
 
 # Testing
 # -------
