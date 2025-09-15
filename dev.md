@@ -62,9 +62,7 @@ frappe_bench/
 ```json
 {
   "wiki_space": {
-    "route": "architecture",
-    "title": "Architecture Docs",
-    "description": "App architecture documentation"
+    "route": "architecture"
   }
 }
 ```
@@ -85,9 +83,7 @@ architecture/
 ```json
 {
   "wiki_space": {
-    "route": "architecture",
-    "title": "Architecture Docs",
-    "description": "App architecture documentation"
+    "route": "architecture"
   },
   "groups": [
     {
@@ -224,7 +220,7 @@ Wiki Page with /private/files/ → auto_process_wiki_page_files() → Move to pu
 7. ✅ **Fixed folder organization** - Auto-creates organized folder structure
 
 ### Benefits
-- **Massive Config Reduction**: 92% less configuration needed (7 lines vs 80+ lines)
+- **Massive Config Reduction**: 96% less configuration needed (3 lines vs 80+ lines)
 - **Zero Manual Ordering**: Bracket notation handles all page sequencing
 - **Structure Preservation**: Never modifies existing bracketed files/folders
 - **Simplified Setup**: Users only need to specify wiki space metadata
@@ -276,13 +272,11 @@ apps/emr_plus/emr_plus/docs/architecture/
     └── [1]crm-integration.md       # Preserved: actual file name → route: architecture/crm-integration
 ```
 
-_config.json (7 lines):
+_config.json (3 lines):
 ```json
 {
   "wiki_space": {
-    "route": "architecture",
-    "title": "EMR Plus Architecture Documentation",
-    "description": "Comprehensive architecture documentation for EMR Plus"
+    "route": "architecture"
   }
 }
 ```

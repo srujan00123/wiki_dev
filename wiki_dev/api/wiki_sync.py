@@ -536,9 +536,7 @@ def load_wiki_config_with_autodiscovery(folder_path, wiki_space_route):
 			if auto_groups:
 				config = {
 					"wiki_space": {
-						"route": wiki_space_route,
-						"title": f"{wiki_space_route.title()} Documentation",
-						"description": f"Auto-generated documentation for {wiki_space_route}"
+						"route": wiki_space_route
 					},
 					"groups": auto_groups
 				}

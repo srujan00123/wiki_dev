@@ -55,9 +55,7 @@ apps/your_app/your_app/docs/docs/
 ```json
 {
   "wiki_space": {
-    "route": "docs",
-    "title": "Documentation",
-    "description": "App documentation"
+    "route": "docs"
   }
 }
 ```
@@ -108,7 +106,7 @@ Use `[n]name` to specify explicit ordering:
 - `notes.md` → Auto-order, Title "Notes"
 
 **Benefits:**
-- **92% less config** (7 lines vs 80+ lines)
+- **96% less config** (3 lines vs 80+ lines)
 - **Structure preservation** (never modifies existing bracketed files/folders)
 - **Conflict-free ordering** (brackets don't affect actual file names)
 - **Memory-only processing** (auto-discovery works without file creation)
