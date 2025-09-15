@@ -57,10 +57,35 @@ frappe_bench/
 - **public_assets_path**: Public URL path ("/assets/emr_plus/docs")
 
 ### 2. Config File Structure (_config.json)
+
+#### Option A: Minimal Config with Auto-Discovery (Recommended)
 ```json
 {
   "wiki_space": {
-    "route": "architecture",         // Uses wiki_space_name directly
+    "route": "architecture",
+    "title": "Architecture Docs",
+    "description": "App architecture documentation"
+  }
+}
+```
+
+With folder structure using bracket notation:
+```
+architecture/
+├── [1]core-architecture/     # Order=1, Group="Core Architecture"
+│   ├── [1]overview.md        # Order=1, Title="Overview"
+│   └── [2]backend.md         # Order=2, Title="Backend"
+├── [2]guides/                # Order=2, Group="Guides"
+│   └── setup.md              # Auto-order, Title="Setup"
+└── misc/                     # Auto-order, Group="Misc"
+    └── notes.md              # Auto-order, Title="Notes"
+```
+
+#### Option B: Full Manual Config (Legacy)
+```json
+{
+  "wiki_space": {
+    "route": "architecture",
     "title": "Architecture Docs",
     "description": "App architecture documentation"
   },
@@ -70,9 +95,9 @@ frappe_bench/
       "order": 1,
       "pages": [
         {
-          "file": "01-overview.md",           // Relative to wiki space folder
+          "file": "01-overview.md",
           "title": "Overview",
-          "route": "architecture/overview",   // Full route
+          "route": "architecture/overview",
           "order": 1
         }
       ]
@@ -80,6 +105,58 @@ frappe_bench/
   ]
 }
 ```
+
+## Auto-Discovery Feature (v3.0)
+
+### Bracket Notation Convention
+
+Use `[n]name` to specify order explicitly, preserving the actual folder/file structure:
+
+**Folders (Groups):**
+- `[1]core-architecture/` → Order=1, Name="Core Architecture", Folder=`[1]core-architecture/`
+- `[3]advanced/` → Order=3, Name="Advanced", Folder=`[3]advanced/`
+- `guides/` → Auto-order, Name="Guides", Folder=`guides/`
+
+**Files (Pages):**
+- `[1]overview.md` → Order=1, Title="Overview", Route="architecture/overview", File=`[1]overview.md`
+- `[2]setup.md` → Order=2, Title="Setup", Route="architecture/setup", File=`[2]setup.md`
+- `notes.md` → Auto-order, Title="Notes", Route="architecture/notes", File=`notes.md`
+
+### Auto-Discovery Logic
+
+1. **Scan folder structure** preserving actual folder/file names
+2. **Parse bracket notation** `[n]name` to extract order and clean names for titles/routes
+3. **Generate clean titles** by converting dashes to spaces and title-casing
+4. **Create clean routes** by removing brackets from paths
+5. **Fill gaps** with alphabetical ordering for non-bracketed items
+6. **Work in memory only** - never modify the actual file structure
+
+### Structure Preservation
+
+**Key Principle**: Auto-discovery **NEVER** creates clean folders or modifies existing files.
+
+- ✅ **Preserves bracketed structure**: `[1]core-architecture/[1]frontend.md` stays exactly as-is
+- ✅ **Generates clean routes**: Creates route `architecture/frontend` for Wiki Pages
+- ✅ **Minimal config**: _config.json contains only wiki_space metadata
+- ✅ **Memory-only processing**: All auto-discovery happens in memory
+- ✅ **No file creation**: Sync functions skip automatic file creation in auto-discovery mode
+
+### Benefits
+
+- **92% Config Reduction**: From 80+ lines to 7 lines
+- **Zero Manual Ordering**: Bracket notation handles sequencing
+- **Structure Preservation**: Never modifies existing bracketed files/folders
+- **Conflict-Free**: `[n]` never interferes with actual file names
+- **Flexible**: Mix bracketed and non-bracketed items
+- **Backward Compatible**: Full configs still work
+- **Manual Control**: Users create bracketed files manually
+
+### Auto-Discovery Functions
+
+- `parse_bracket_notation()` - Extract order from `[n]name` format
+- `scan_wiki_folder_structure()` - Auto-generate config from folders
+- `load_wiki_config_with_autodiscovery()` - Smart config loading
+- `clean_name_to_title()` - Convert file names to proper titles
 
 ## Sync Logic Flow
 
@@ -125,6 +202,18 @@ Wiki Page with /private/files/ → auto_process_wiki_page_files() → Move to pu
 
 ## Refactoring History
 
+### Completed Refactoring (v3.0)
+1. ✅ **Bracket notation auto-discovery** - Use `[n]name` for ordering without config
+2. ✅ **Minimal _config.json support** - Only wiki space metadata needed
+3. ✅ **Automatic folder scanning** - Generate groups/pages from folder structure
+4. ✅ **Smart title generation** - Convert file names to proper titles
+5. ✅ **Clean route generation** - Remove brackets from final routes
+6. ✅ **Sequential ordering fix** - Pages now order 1, 2, 3 instead of 23, 24, 32
+7. ✅ **Structure preservation** - Never creates clean folders, preserves bracketed files
+8. ✅ **Memory-only processing** - Auto-discovery works purely in memory
+9. ✅ **Sync function protection** - Prevents file creation in auto-discovery mode
+10. ✅ **Backward compatibility** - Full configs still work alongside auto-discovery
+
 ### Completed Refactoring (v2.0)
 1. ✅ **Removed wiki_route_prefix field** - Eliminated redundancy with wiki_space_name
 2. ✅ **Added after_migrate hook** - Now in hooks.py for automatic migration sync
@@ -135,12 +224,16 @@ Wiki Page with /private/files/ → auto_process_wiki_page_files() → Move to pu
 7. ✅ **Fixed folder organization** - Auto-creates organized folder structure
 
 ### Benefits
-- **Simplified Setup**: Users only need to specify wiki_space_name once
-- **Clearer Logic**: Direct 1:1 mapping between folder name and route
-- **Automatic Migration**: Built-in sync during bench migrate
-- **Reduced Confusion**: No more duplicate/conflicting route configurations
-- **Auto-Organization**: System creates proper folder structure from _config.json groups
-- **Complete Sync**: Creates missing pages, doesn't just update existing ones
+- **Massive Config Reduction**: 92% less configuration needed (7 lines vs 80+ lines)
+- **Zero Manual Ordering**: Bracket notation handles all page sequencing
+- **Structure Preservation**: Never modifies existing bracketed files/folders
+- **Simplified Setup**: Users only need to specify wiki space metadata
+- **Conflict-Free Ordering**: Brackets never interfere with actual file naming
+- **Memory-Only Processing**: Auto-discovery works purely in memory without file creation
+- **Manual Control**: Users create and organize bracketed files themselves
+- **Flexible Usage**: Mix explicit ordering with automatic ordering
+- **Backward Compatible**: Existing full configs continue to work
+- **Clean Route Generation**: Final Wiki Page routes don't contain bracket notation
 
 ## Testing
 - Migration sync: `bench --site {site} migrate`
@@ -170,16 +263,42 @@ Wiki Page with /private/files/ → auto_process_wiki_page_files() → Move to pu
 
 4. Run migration to auto-sync: `bench --site {site} migrate`
 
-### Example Setup
+### Example Setup (Auto-Discovery)
 ```
 apps/emr_plus/emr_plus/docs/architecture/
-├── _config.json
+├── _config.json                    # Minimal: just wiki space metadata
+├── [1]core-architecture/           # Preserved: actual folder name
+│   ├── [1]frontend.md              # Preserved: actual file name → route: architecture/frontend
+│   └── [2]backend.md               # Preserved: actual file name → route: architecture/backend
+├── [2]integration-components/      # Preserved: actual folder name
+│   └── [1]doctype-integration.md   # Preserved: actual file name → route: architecture/doctype-integration
+└── [3]implementation-guides/       # Preserved: actual folder name
+    └── [1]crm-integration.md       # Preserved: actual file name → route: architecture/crm-integration
+```
+
+_config.json (7 lines):
+```json
+{
+  "wiki_space": {
+    "route": "architecture",
+    "title": "EMR Plus Architecture Documentation",
+    "description": "Comprehensive architecture documentation for EMR Plus"
+  }
+}
+```
+
+**Key**: All folders and files keep their bracketed names. Auto-discovery generates clean routes for Wiki Pages without modifying the file structure.
+
+### Example Setup (Legacy Full Config)
+```
+apps/emr_plus/emr_plus/docs/architecture/
+├── _config.json                    # Full config with all groups/pages
 ├── 01-overview.md
 └── implementation/
     └── guide.md
 ```
 
-Wiki Dev Settings:
+Wiki Dev Settings (both approaches):
 - app_name: "emr_plus"
 - wiki_space_name: "architecture"
 - docs_folder_path: "apps/emr_plus/emr_plus/docs"

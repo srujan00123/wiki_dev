@@ -100,19 +100,25 @@ def create_wiki_pages_from_folder(folder_path, wiki_space_name, settings):
 
 
 def setup_wiki_sidebar_from_folder(folder_path, wiki_space_name, settings):
-	"""Setup hierarchical wiki sidebar from folder configuration"""
-	config_path = os.path.join(folder_path, "_config.json")
-	
-	with open(config_path, 'r') as f:
-		config = json.load(f)
-
-	# Resequence all pages to ensure proper ordering from 1
-	if resequence_all_pages_in_config(config):
-		with open(config_path, 'w') as f:
-			json.dump(config, f, indent=2)
-
+	"""Setup hierarchical wiki sidebar from folder configuration or auto-discovery"""
 	space_doc = frappe.get_doc("Wiki Space", wiki_space_name)
-	wiki_space_route = config["wiki_space"]["route"]
+
+	# Get the wiki space route from the space document
+	wiki_space_route = space_doc.route
+
+	# Load config with auto-discovery support
+	config = load_wiki_config_with_autodiscovery(folder_path, wiki_space_route)
+
+	if not config:
+		frappe.log_error(f"Could not load config or auto-discover structure for {folder_path}", "Wiki Sidebar Setup")
+		return
+
+	# DON'T write auto-generated configs back to _config.json
+	# This preserves the minimal config approach where _config.json only contains wiki_space metadata
+	# Auto-discovery should work purely in memory without modifying the config file
+
+	# Skip resequencing for auto-discovered configs to prevent writes
+	# The auto-discovery already handles proper ordering via bracket notation
 	
 	# Clear existing sidebar and navbar
 	space_doc.wiki_sidebars = []
@@ -236,14 +242,16 @@ def update_wiki_space_from_folder(settings_name, folder_name=None):
 		
 		docs_path = settings.get_full_docs_path()
 		folder_path = os.path.join(docs_path, folder_name)
-		config_path = os.path.join(folder_path, "_config.json")
-		
-		if not os.path.exists(config_path):
-			return {"success": False, "message": f"Configuration file not found: {config_path}"}
-		
-		with open(config_path, 'r') as f:
-			config = json.load(f)
-		
+
+		# Use the folder name as the wiki space route for auto-discovery
+		wiki_space_route = folder_name
+
+		# Load config with auto-discovery support
+		config = load_wiki_config_with_autodiscovery(folder_path, wiki_space_route)
+
+		if not config:
+			return {"success": False, "message": f"Could not load or auto-discover configuration for: {folder_path}"}
+
 		wiki_space_route = config["wiki_space"]["route"]
 		
 		# Find existing wiki space
@@ -511,10 +519,34 @@ def fix_page_placement_if_needed(doc_name, doc_route):
 
 def sync_existing_page(doc, config, item_path, settings, wiki_space_route=None):
 	"""Sync existing page that's already in _config.json"""
+	config_path = os.path.join(item_path, "_config.json")
+
+	# In auto-discovery mode, don't create new files - only update existing bracketed files
+	if is_auto_discovery_mode(config_path):
+		# Find the actual bracketed file that corresponds to this route
+		route_without_space = doc.route.replace(f"{wiki_space_route}/", "") if wiki_space_route else doc.route
+
+		# Search for existing bracketed files that would generate this clean route
+		for group in config.get("groups", []):
+			for page_config in group.get("pages", []):
+				if page_config['route'] == doc.route:
+					# Found matching page in auto-discovery config
+					bracketed_file_path = os.path.join(item_path, page_config["file"])
+
+					# Only update if the bracketed file actually exists
+					if os.path.exists(bracketed_file_path):
+						with open(bracketed_file_path, 'w') as f:
+							f.write(doc.content)
+						print(f"Wiki Sync: Updated existing bracketed page '{doc.title}' to {bracketed_file_path}")
+						return True
+
+		return False  # Page not found in existing bracketed structure
+
+	# Traditional mode - work with config as before
 	for group in config.get("groups", []):
 		for page_config in group.get("pages", []):
 			expected_route = page_config['route']
-			
+
 			if doc.route == expected_route:
 				# Check if parent label has changed
 				if wiki_space_route:
@@ -522,22 +554,22 @@ def sync_existing_page(doc, config, item_path, settings, wiki_space_route=None):
 					if current_parent_label and current_parent_label != group.get("name"):
 						# Parent label changed - return False to let sync_misplaced_page handle it
 						return False
-				
+
 				# Sync this page back to markdown
 				# File paths in config are relative to wiki space folder
 				file_path = os.path.join(item_path, page_config["file"])
-				
+
 				# Ensure directory exists
 				if settings.create_missing_folders:
 					os.makedirs(os.path.dirname(file_path), exist_ok=True)
-				
+
 				# Write updated content
 				with open(file_path, 'w') as f:
 					f.write(doc.content)
-				
+
 				print(f"Wiki Sync: Updated existing page '{doc.title}' to {file_path}")
 				return True
-	
+
 	return False
 
 
@@ -562,6 +594,13 @@ def get_current_parent_label(doc, wiki_space_route):
 def sync_new_page(doc, config, item_path, settings, config_path, wiki_space_route):
 	"""Handle new wiki page created in UI - add to config and create markdown file"""
 	try:
+		# In auto-discovery mode, do NOT create new files automatically
+		# Users should manually create bracketed files for auto-discovery
+		if is_auto_discovery_mode(config_path):
+			print(f"Wiki Sync: Auto-discovery mode - skipping automatic file creation for '{doc.title}'. Please create bracketed file manually.")
+			return False
+
+		# Traditional mode - create files as before
 		# Extract page name from route (e.g., "docs/new-page" -> "new-page")
 		page_name = doc.route.replace(f"{wiki_space_route}/", "")
 
@@ -592,15 +631,15 @@ def sync_new_page(doc, config, item_path, settings, config_path, wiki_space_rout
 		relative_file_path = f"{folder_name}/{file_name}"
 		# For file system: absolute path
 		full_file_path = os.path.join(item_path, relative_file_path)
-		
+
 		# Create directory if needed
 		if settings.create_missing_folders:
 			os.makedirs(os.path.dirname(full_file_path), exist_ok=True)
-		
+
 		# Write markdown content
 		with open(full_file_path, 'w') as f:
 			f.write(doc.content)
-		
+
 		# Update _config.json to include this new page
 		updated = update_config_with_new_page(config, parent_label, {
 			"file": relative_file_path,
@@ -610,11 +649,14 @@ def sync_new_page(doc, config, item_path, settings, config_path, wiki_space_rout
 		})
 		
 		if updated:
-			# Write updated config back to file
-			with open(config_path, 'w') as f:
-				json.dump(config, f, indent=2)
-			
-			print(f"Wiki Sync: Created new page '{doc.title}' at {full_file_path} and updated _config.json")
+			# Only write config if NOT in auto-discovery mode
+			if not is_auto_discovery_mode(config_path):
+				# Write updated config back to file
+				with open(config_path, 'w') as f:
+					json.dump(config, f, indent=2)
+				print(f"Wiki Sync: Created new page '{doc.title}' at {full_file_path} and updated _config.json")
+			else:
+				print(f"Wiki Sync: Created new page '{doc.title}' at {full_file_path} (auto-discovery mode, config not updated)")
 			return True
 		
 	except Exception as e:
@@ -626,27 +668,42 @@ def sync_new_page(doc, config, item_path, settings, config_path, wiki_space_rout
 def sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_space_route):
 	"""Handle pages that exist in config but are in the wrong parent group"""
 	try:
+		# In auto-discovery mode, don't move files around - just update content in place
+		if is_auto_discovery_mode(config_path):
+			# Find the existing bracketed file and update its content
+			for group in config.get("groups", []):
+				for page_config in group.get("pages", []):
+					if page_config.get("route") == doc.route:
+						bracketed_file_path = os.path.join(item_path, page_config["file"])
+						if os.path.exists(bracketed_file_path):
+							with open(bracketed_file_path, 'w') as f:
+								f.write(doc.content)
+							print(f"Wiki Sync: Updated bracketed page content for '{doc.title}' in {bracketed_file_path}")
+							return True
+			return False  # Page not found in bracketed structure
+
+		# Traditional mode - move files as before
 		# Get the current parent label from sidebar
 		wiki_spaces = frappe.get_all("Wiki Space", filters={"route": wiki_space_route}, limit=1)
 		if not wiki_spaces:
 			return False
-		
+
 		wiki_space = frappe.get_doc("Wiki Space", wiki_spaces[0].name)
 		current_parent_label = None
-		
+
 		# Find the sidebar entry for this page
 		for sidebar_item in wiki_space.wiki_sidebars:
 			if sidebar_item.wiki_page == doc.name:
 				current_parent_label = sidebar_item.parent_label
 				break
-		
+
 		if not current_parent_label:
 			return False
-		
+
 		# Look for this page in ANY group in the config
 		page_found_in_group = None
 		page_config_to_move = None
-		
+
 		for group in config.get("groups", []):
 			for page_config in group.get("pages", []):
 				if page_config.get("route") == doc.route:
@@ -657,7 +714,7 @@ def sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_spac
 					break
 			if page_found_in_group:
 				break
-		
+
 		# If page was found in config but in wrong group, move it
 		if page_found_in_group and page_found_in_group != current_parent_label:
 			# Update the file path in the page config
@@ -666,15 +723,15 @@ def sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_spac
 			old_file_path = page_config_to_move["file"]
 			# For config file: relative path from wiki space folder
 			new_file_path = f"{folder_name}/{page_name}.md"
-			
+
 			# Move the actual file
 			old_full_path = os.path.join(item_path, "..", old_file_path)
 			new_full_path = os.path.join(item_path, new_file_path)
-			
+
 			# Create directory if needed
 			if settings.create_missing_folders:
 				os.makedirs(os.path.dirname(new_full_path), exist_ok=True)
-			
+
 			# Move file if it exists
 			if os.path.exists(old_full_path):
 				import shutil
@@ -683,22 +740,25 @@ def sync_misplaced_page(doc, config, item_path, settings, config_path, wiki_spac
 				# Create new file with current content
 				with open(new_full_path, 'w') as f:
 					f.write(doc.content)
-			
+
 			# Update the page config
 			page_config_to_move["file"] = new_file_path
-			
+
 			# Add to correct group
 			updated = update_config_with_new_page(config, current_parent_label, page_config_to_move)
 			
 			if updated:
 				# Clean up empty groups
 				config["groups"] = [g for g in config.get("groups", []) if g.get("pages")]
-				
-				# Write updated config back to file
-				with open(config_path, 'w') as f:
-					json.dump(config, f, indent=2)
-				
-				print(f"Wiki Sync: Moved page '{doc.title}' from '{page_found_in_group}' to '{current_parent_label}' group")
+
+				# Only write config if NOT in auto-discovery mode
+				if not is_auto_discovery_mode(config_path):
+					# Write updated config back to file
+					with open(config_path, 'w') as f:
+						json.dump(config, f, indent=2)
+					print(f"Wiki Sync: Moved page '{doc.title}' from '{page_found_in_group}' to '{current_parent_label}' group")
+				else:
+					print(f"Wiki Sync: Moved page '{doc.title}' from '{page_found_in_group}' to '{current_parent_label}' group (auto-discovery mode, config not updated)")
 				return True
 		
 		return False
@@ -789,6 +849,257 @@ def resequence_all_pages_in_config(config):
 		return False
 
 
+@frappe.whitelist()
+def debug_wiki_pages():
+	"""Debug function to check Wiki Pages"""
+	try:
+		pages = frappe.get_all("Wiki Page",
+			filters=[["route", "like", "architecture/%"]],
+			fields=["name", "route", "title"]
+		)
+
+		result = {"success": True, "pages": []}
+		for page in pages:
+			result["pages"].append({
+				"route": page.route,
+				"title": page.title,
+				"name": page.name
+			})
+
+		return result
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def debug_wiki_sidebar():
+	"""Debug function to check Wiki Space sidebar"""
+	try:
+		wiki_space_name = frappe.db.get_value("Wiki Space", {"route": "architecture"}, "name")
+		if not wiki_space_name:
+			return {"success": False, "error": "Wiki Space not found"}
+
+		wiki_space = frappe.get_doc("Wiki Space", wiki_space_name)
+
+		result = {"success": True, "sidebar_items": [], "wiki_space": wiki_space_name}
+		for item in wiki_space.wiki_sidebars:
+			result["sidebar_items"].append({
+				"parent_label": item.parent_label,
+				"wiki_page": item.wiki_page,
+				"title": frappe.db.get_value("Wiki Page", item.wiki_page, "title") if item.wiki_page else None
+			})
+
+		return result
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+def is_auto_discovery_mode(config_path):
+	"""Check if we're in auto-discovery mode (minimal config with only wiki_space)"""
+	try:
+		if not os.path.exists(config_path):
+			return True  # No config file means auto-discovery
+
+		with open(config_path, 'r') as f:
+			config = json.load(f)
+
+		# Auto-discovery mode if no groups are defined or groups are empty
+		return "groups" not in config or not config.get("groups")
+	except:
+		return True  # Error reading config, assume auto-discovery
+
+
+def parse_bracket_notation(name):
+	"""Parse bracket notation [n]name to extract order and clean name"""
+	import re
+
+	# Match pattern [number]name
+	match = re.match(r'^\[(\d+)\](.+)$', name)
+	if match:
+		order = int(match.group(1))
+		clean_name = match.group(2)
+		return order, clean_name
+
+	# No bracket notation found
+	return None, name
+
+
+def clean_name_to_title(name):
+	"""Convert file/folder name to human-readable title"""
+	# Remove .md extension
+	if name.endswith('.md'):
+		name = name[:-3]
+
+	# Convert dashes/underscores to spaces and title case
+	title = name.replace('-', ' ').replace('_', ' ')
+	title = ' '.join(word.capitalize() for word in title.split())
+
+	return title
+
+
+def scan_wiki_folder_structure(folder_path, wiki_space_route):
+	"""Scan folder structure and auto-generate config using bracket notation"""
+	try:
+		import os
+
+		if not os.path.exists(folder_path):
+			return None
+
+		groups = []
+
+		# Get all subdirectories (groups)
+		items = []
+		for item in os.listdir(folder_path):
+			item_path = os.path.join(folder_path, item)
+			if os.path.isdir(item_path) and not item.startswith('_'):
+				items.append(item)
+
+		# Sort and process folders
+		folder_orders = {}
+		unordered_folders = []
+
+		for folder in items:
+			order, clean_name = parse_bracket_notation(folder)
+			if order is not None:
+				folder_orders[order] = (folder, clean_name)
+			else:
+				unordered_folders.append(folder)
+
+		# Sort folders: ordered first, then unordered alphabetically
+		sorted_folders = []
+		for order in sorted(folder_orders.keys()):
+			folder, clean_name = folder_orders[order]
+			# Use clean name for title, but keep original folder name
+			group_title = clean_name_to_title(clean_name)
+			sorted_folders.append((folder, group_title, order))
+
+		# Add unordered folders after ordered ones
+		next_order = max(folder_orders.keys()) + 1 if folder_orders else 1
+		for folder in sorted(unordered_folders):
+			# For non-bracketed folders, use the folder name as-is for title
+			group_title = clean_name_to_title(folder)
+			sorted_folders.append((folder, group_title, next_order))
+			next_order += 1
+
+		# Process each group folder
+		for folder_name, group_title, group_order in sorted_folders:
+			folder_path_full = os.path.join(folder_path, folder_name)
+
+			# Get all .md files in this folder
+			pages = []
+			page_files = []
+			for item in os.listdir(folder_path_full):
+				if item.endswith('.md') and not item.startswith('_'):
+					page_files.append(item)
+
+			# Sort pages similar to folders
+			page_orders = {}
+			unordered_pages = []
+
+			for page_file in page_files:
+				page_name = page_file[:-3]  # Remove .md
+				order, clean_name = parse_bracket_notation(page_name)
+				if order is not None:
+					page_orders[order] = (page_file, clean_name)
+				else:
+					unordered_pages.append(page_file)
+
+			# Sort pages: ordered first, then unordered alphabetically
+			sorted_pages = []
+			for order in sorted(page_orders.keys()):
+				page_file, clean_name = page_orders[order]
+				sorted_pages.append((page_file, clean_name, order))
+
+			# Add unordered pages after ordered ones
+			next_page_order = max(page_orders.keys()) + 1 if page_orders else 1
+			for page_file in sorted(unordered_pages):
+				page_name = page_file[:-3]  # Remove .md
+				clean_name = clean_name_to_title(page_name)
+				sorted_pages.append((page_file, clean_name, next_page_order))
+				next_page_order += 1
+
+			# Build pages list for this group
+			for page_file, page_title, page_order in sorted_pages:
+				page_name = page_file[:-3]  # Remove .md
+
+				# Generate clean route (remove brackets) for Wiki Page matching
+				_, clean_page_name = parse_bracket_notation(page_name)
+				page_route = f"{wiki_space_route}/{clean_page_name}"
+
+				# Convert name to proper title only if it was auto-generated
+				if page_title == page_name:  # Was auto-generated from filename
+					# For bracketed files, extract clean name for title
+					page_title = clean_name_to_title(clean_page_name)
+				elif '[' in page_title and ']' in page_title:  # Was extracted from bracket
+					page_title = clean_name_to_title(page_title)
+
+				# File path relative to wiki space folder - keep actual folder/file names
+				relative_file_path = f"{folder_name}/{page_file}"
+
+				pages.append({
+					"file": relative_file_path,
+					"title": page_title,
+					"route": page_route,
+					"order": page_order
+				})
+
+			# Add group to config
+			if pages:  # Only add groups that have pages
+				groups.append({
+					"name": group_title,
+					"order": group_order,
+					"pages": pages
+				})
+
+		return groups
+
+	except Exception as e:
+		frappe.log_error(f"Error scanning wiki folder structure: {str(e)}", "Wiki Auto-Discovery")
+		return None
+
+
+def load_wiki_config_with_autodiscovery(folder_path, wiki_space_route):
+	"""Load config from _config.json or auto-generate from folder structure"""
+	try:
+		config_path = os.path.join(folder_path, "_config.json")
+
+		# Try to load existing _config.json
+		if os.path.exists(config_path):
+			with open(config_path, 'r') as f:
+				config = json.load(f)
+
+			# Check if it's a minimal config (no groups defined)
+			if "groups" not in config or not config["groups"]:
+				# Use auto-discovery for groups
+				auto_groups = scan_wiki_folder_structure(folder_path, wiki_space_route)
+				if auto_groups:
+					config["groups"] = auto_groups
+					print(f"Wiki Auto-Discovery: Generated {len(auto_groups)} groups from folder structure")
+
+			return config
+
+		else:
+			# No config file - create minimal config with auto-discovery
+			auto_groups = scan_wiki_folder_structure(folder_path, wiki_space_route)
+			if auto_groups:
+				config = {
+					"wiki_space": {
+						"route": wiki_space_route,
+						"title": f"{wiki_space_route.title()} Documentation",
+						"description": f"Auto-generated documentation for {wiki_space_route}"
+					},
+					"groups": auto_groups
+				}
+				print(f"Wiki Auto-Discovery: Created config with {len(auto_groups)} groups from folder structure")
+				return config
+
+		return None
+
+	except Exception as e:
+		frappe.log_error(f"Error loading wiki config with auto-discovery: {str(e)}", "Wiki Config Loading")
+		return None
+
+
 def sync_wiki_page_deletion_to_markdown(doc, method=None):
 	"""Hook function: Remove markdown file when wiki page is deleted"""
 	try:
@@ -853,10 +1164,12 @@ def remove_page_from_config(doc, config, item_path, config_path):
 		if page_found:
 			# Remove empty groups
 			config["groups"] = [g for g in config.get("groups", []) if g.get("pages")]
-			
-			# Update config file
-			with open(config_path, 'w') as f:
-				json.dump(config, f, indent=2)
+
+			# Only update config file if NOT in auto-discovery mode
+			if not is_auto_discovery_mode(config_path):
+				# Update config file
+				with open(config_path, 'w') as f:
+					json.dump(config, f, indent=2)
 			
 			# Delete markdown file if it exists
 			if file_path and os.path.exists(file_path):
