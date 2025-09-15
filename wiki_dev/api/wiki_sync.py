@@ -64,13 +64,18 @@ def create_wiki_space_from_folder(settings_name, folder_name=None):
 
 
 def create_wiki_pages_from_folder(folder_path, wiki_space_name, settings):
-	"""Create Wiki Pages from markdown files based on folder configuration"""
-	config_path = os.path.join(folder_path, "_config.json")
-	
-	with open(config_path, 'r') as f:
-		config = json.load(f)
-	
-	wiki_space_route = config["wiki_space"]["route"]
+	"""Create Wiki Pages from markdown files based on folder configuration or auto-discovery"""
+	# Get the wiki space route from the wiki space document
+	space_doc = frappe.get_doc("Wiki Space", wiki_space_name)
+	wiki_space_route = space_doc.route
+
+	# Load config with auto-discovery support
+	config = load_wiki_config_with_autodiscovery(folder_path, wiki_space_route)
+
+	if not config:
+		frappe.log_error(f"Could not load config or auto-discover structure for {folder_path}", "Wiki Page Creation")
+		return 0
+
 	pages_created = 0
 	
 	for group in config.get("groups", []):
