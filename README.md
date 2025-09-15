@@ -52,11 +52,22 @@ apps/your_app/your_app/docs/docs/
 **That's it!** Groups and pages auto-discovered from existing folder structure (no files moved or renamed).
 
 ### 4. Create Wiki Dev Settings
+
+Go to **Wiki Dev Settings** in your Frappe desk and create a new record:
+
+**Required Fields:**
 - **App Name**: `your_app`
-- **Wiki Space Name**: `docs`
+- **Wiki Space Name**: `docs` (matches your folder name)
 - **Docs Folder Path**: `apps/your_app/your_app/docs`
-- Enable sync options
-```
+
+**Optional Configuration:**
+- **File Upload Path**: `apps/your_app/public/docs/images` (for uploaded images)
+- **Public Assets Path**: `/assets/your_app/docs` (public URL for images)
+- **Sync Options**: Enable as needed (all enabled by default)
+  - Sync On Migrate
+  - Sync On Wiki Update
+  - Use Parent Label Folders
+  - Auto Publish Pages
 
 ### 5. Run migration
 ```bash
