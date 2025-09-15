@@ -41,7 +41,7 @@ def test_migration_sync():
         delete_result = delete_test_wiki_space()
         
         # Then run migration sync (should create the wiki space)
-        from wiki_dev.wiki_dev.api.wiki_sync import sync_all_enabled_settings
+        from wiki_dev.api.wiki_sync import sync_all_enabled_settings
         sync_result = sync_all_enabled_settings()
         
         return {

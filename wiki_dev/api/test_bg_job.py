@@ -27,7 +27,7 @@ def test_background_job():
         
         # Check if the background job function exists and can be called
         try:
-            from wiki_dev.wiki_dev.api.wiki_sync import fix_page_placement_if_needed
+            from wiki_dev.api.wiki_sync import fix_page_placement_if_needed
             results.append("✓ Background job function is importable")
             
             # Test the function directly
@@ -39,7 +39,7 @@ def test_background_job():
         
         # Check scheduler function
         try:
-            from wiki_dev.wiki_dev.api.wiki_sync import check_and_fix_misplaced_pages
+            from wiki_dev.api.wiki_sync import check_and_fix_misplaced_pages
             results.append("✓ Scheduler function is importable")
             
             result = check_and_fix_misplaced_pages()
@@ -100,7 +100,7 @@ def test_enqueue():
     try:
         # Test enqueue directly
         frappe.enqueue(
-            'wiki_dev.wiki_dev.api.test_bg_job.test_bg_job_task',
+            'wiki_dev.api.test_bg_job.test_bg_job_task',
             queue='short',
             timeout=60,
             enqueue_after_commit=True,
@@ -153,13 +153,13 @@ def test_misplaced_page_fix():
             # Test the fix function directly - this is the main functionality
             results.append(f"Testing fix_page_placement_if_needed...")
             
-            from wiki_dev.wiki_dev.api.wiki_sync import fix_page_placement_if_needed
+            from wiki_dev.api.wiki_sync import fix_page_placement_if_needed
             fix_result = fix_page_placement_if_needed(wiki_page.name, wiki_page.route)
             results.append(f"Fix result: {fix_result}")
             
             # Check the _config.json to see if the page was moved
             results.append("Checking _config.json after fix...")
-            from wiki_dev.wiki_dev.api.wiki_sync import sync_all_enabled_settings
+            from wiki_dev.api.wiki_sync import sync_all_enabled_settings
             sync_result = sync_all_enabled_settings()
             results.append(f"Sync result: {sync_result}")
         else:
@@ -167,7 +167,7 @@ def test_misplaced_page_fix():
             
         # Also test the scheduled task function
         results.append("Testing scheduled task function...")
-        from wiki_dev.wiki_dev.api.wiki_sync import check_and_fix_misplaced_pages
+        from wiki_dev.api.wiki_sync import check_and_fix_misplaced_pages
         scheduled_result = check_and_fix_misplaced_pages()
         results.append(f"Scheduled task result: {scheduled_result}")
         

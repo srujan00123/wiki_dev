@@ -64,7 +64,7 @@ Pages accessible at `/docs/getting-started`
 
 ```bash
 # Manual sync
-bench --site your_site execute wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings
+bench --site your_site execute wiki_dev.api.wiki_sync.sync_all_enabled_settings
 ```
 
 ## Troubleshooting
@@ -76,7 +76,7 @@ bench --site your_site execute wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_
 
 **Pages in wrong folder?**
 - Background jobs auto-fix within minutes
-- Or run: `bench execute wiki_dev.wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages`
+- Or run: `bench execute wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages`
 
 ## License
 

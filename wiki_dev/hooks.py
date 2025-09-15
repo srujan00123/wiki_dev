@@ -92,7 +92,7 @@ after_install = "wiki_dev.install.after_install"
 # ------------
 
 after_migrate = [
-	"wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings"  # Sync wiki docs on migration
+	"wiki_dev.api.wiki_sync.sync_all_enabled_settings"  # Sync wiki docs on migration
 ]
 
 # Uninstallation
@@ -142,22 +142,22 @@ after_migrate = [
 doc_events = {
 	"Wiki Page": {
 		"after_insert": [
-			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_page_to_markdown",
+			"wiki_dev.api.wiki_sync.sync_wiki_page_to_markdown",
 		],
 		"on_update": [
-			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_page_to_markdown",
-			"wiki_dev.wiki_dev.api.wiki_file_handler.auto_process_wiki_page_files"
+			"wiki_dev.api.wiki_sync.sync_wiki_page_to_markdown",
+			"wiki_dev.api.wiki_file_handler.auto_process_wiki_page_files"
 		],
 		"on_trash": [
-			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_page_deletion_to_markdown",
+			"wiki_dev.api.wiki_sync.sync_wiki_page_deletion_to_markdown",
 		],
 	},
 	"Wiki Space": {
 		"on_update": [
-			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
+			"wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
 		],
 		"after_insert": [
-			"wiki_dev.wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
+			"wiki_dev.api.wiki_sync.sync_wiki_space_sidebar_changes",
 		],
 	},
 }
@@ -168,7 +168,7 @@ doc_events = {
 scheduler_events = {
 	"cron": {
 		"*/5 * * * *": [  # Every 5 minutes
-			"wiki_dev.wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages"
+			"wiki_dev.api.wiki_sync.check_and_fix_misplaced_pages"
 		]
 	}
 }

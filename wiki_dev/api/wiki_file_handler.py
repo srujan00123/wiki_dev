@@ -22,7 +22,7 @@ def process_wiki_file_uploads(wiki_page_name, settings_name=None):
 		if not matches:
 			return {"success": True, "message": "No private files to process"}
 		
-		# Get settings - either provided or find by app name
+		# Get settings - either provided or find by wiki space
 		settings = None
 		if settings_name:
 			settings = frappe.get_doc("Wiki Dev Settings", settings_name)
@@ -30,17 +30,23 @@ def process_wiki_file_uploads(wiki_page_name, settings_name=None):
 			# Try to find settings by wiki space
 			if page.wiki_space:
 				wiki_space_doc = frappe.get_doc("Wiki Space", page.wiki_space)
-				settings_list = frappe.get_all("Wiki Dev Settings", 
-					filters={"enabled": 1, "wiki_space_name": wiki_space_doc.name},
-					limit=1
+				# Find settings that match this wiki space route (now matches directly with wiki_space_name)
+				all_settings = frappe.get_all("Wiki Dev Settings",
+					filters={"enabled": 1},
+					fields=["name", "wiki_space_name"]
 				)
-				if settings_list:
-					settings = frappe.get_doc("Wiki Dev Settings", settings_list[0].name)
+				for setting_data in all_settings:
+					if wiki_space_doc.route == setting_data.wiki_space_name:
+						settings = frappe.get_doc("Wiki Dev Settings", setting_data.name)
+						break
 		
 		if not settings:
 			return {"success": False, "message": "No Wiki Dev Settings found for this page"}
 		
 		docs_assets_path = settings.get_full_upload_path()
+		if not docs_assets_path:
+			return {"success": False, "message": "No upload path configured in settings"}
+		
 		os.makedirs(docs_assets_path, exist_ok=True)
 		
 		updated_content = content
@@ -56,7 +62,7 @@ def process_wiki_file_uploads(wiki_page_name, settings_name=None):
 				
 				# Update content with new path
 				old_ref = f'![{alt_text}](/private/files/{filename})'
-				new_ref = f'![{alt_text}]({settings.public_assets_path}images/{filename})'
+				new_ref = f'![{alt_text}]({settings.public_assets_path}/images/{filename})'
 				updated_content = updated_content.replace(old_ref, new_ref)
 				
 				moved_files.append(filename)
@@ -85,39 +91,6 @@ def process_wiki_file_uploads(wiki_page_name, settings_name=None):
 		return {"success": False, "error": str(e)}
 
 
-@frappe.whitelist()
-def process_all_wiki_pages(settings_name=None):
-	"""Process all wiki pages to move private files to public docs folder"""
-	try:
-		filters = {}
-		if settings_name:
-			settings = frappe.get_doc("Wiki Dev Settings", settings_name)
-			# Filter by wiki spaces that belong to this app
-			wiki_spaces = frappe.get_all("Wiki Space", pluck="name")  # TODO: Add proper filtering
-			filters["wiki_space"] = ["in", wiki_spaces]
-		
-		wiki_pages = frappe.get_all("Wiki Page", filters=filters, pluck="name")
-		total_processed = 0
-		total_moved = 0
-		
-		for page_name in wiki_pages:
-			result = process_wiki_file_uploads(page_name, settings_name)
-			if result.get("success") and result.get("files"):
-				total_processed += 1
-				total_moved += len(result.get("files", []))
-		
-		return {
-			"success": True,
-			"message": f"Processed {total_processed} pages, moved {total_moved} files",
-			"processed": total_processed,
-			"moved": total_moved
-		}
-		
-	except Exception as e:
-		frappe.log_error(f"Wiki Files Processing Error: {str(e)}")
-		return {"success": False, "error": str(e)}
-
-
 def auto_process_wiki_page_files(doc, method=None):
 	"""Hook function: Auto-process uploaded files when wiki page is saved"""
 	try:
@@ -137,6 +110,9 @@ def upload_wiki_image(file_content, filename, settings_name, wiki_page_name=None
 		
 		# Ensure docs assets folder exists
 		docs_assets_path = settings.get_full_upload_path()
+		if not docs_assets_path:
+			return {"success": False, "error": "No upload path configured in settings"}
+		
 		os.makedirs(docs_assets_path, exist_ok=True)
 		
 		# Save file to public docs folder
@@ -155,7 +131,7 @@ def upload_wiki_image(file_content, filename, settings_name, wiki_page_name=None
 				f.write(file_content)
 		
 		# Return public URL path
-		public_url = f"{settings.public_assets_path}images/{filename}"
+		public_url = f"{settings.public_assets_path}/images/{filename}"
 		
 		return {
 			"success": True,
@@ -166,4 +142,74 @@ def upload_wiki_image(file_content, filename, settings_name, wiki_page_name=None
 		
 	except Exception as e:
 		frappe.log_error(f"Wiki Image Upload Error: {str(e)}")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def sync_wiki_to_markdown(settings_name, folder_name=None):
+	"""Sync Wiki Pages back to markdown files (bi-directional sync)"""
+	try:
+		settings = frappe.get_doc("Wiki Dev Settings", settings_name)
+		if not settings.enabled:
+			return {"success": False, "message": "Wiki Dev Settings is disabled"}
+		
+		# Use folder_name from settings if not provided
+		if not folder_name:
+			folder_name = settings.wiki_space_name
+		
+		docs_path = settings.get_full_docs_path()
+		if not docs_path or not os.path.exists(docs_path):
+			return {"success": False, "message": f"Docs path not found: {docs_path}"}
+		
+		folder_path = os.path.join(docs_path, folder_name)
+		config_path = os.path.join(folder_path, "_config.json")
+		
+		if not os.path.exists(config_path):
+			return {"success": False, "message": f"Configuration file not found: {config_path}"}
+		
+		import json
+		with open(config_path, 'r') as f:
+			config = json.load(f)
+		
+		wiki_space_route = config["wiki_space"]["route"]
+		updates = []
+		
+		# Update markdown files from wiki pages
+		for group in config.get("groups", []):
+			for page_config in group.get("pages", []):
+				# Use the full route from config
+				page_route = page_config['route']
+				
+				# Find wiki page
+				wiki_page_doc = frappe.db.get_value("Wiki Page", {"route": page_route}, "name")
+				if wiki_page_doc:
+					page = frappe.get_doc("Wiki Page", wiki_page_doc)
+
+					# File paths in config are relative to wiki space folder
+					file_path = os.path.join(folder_path, page_config["file"])
+					
+					# Read current markdown file
+					current_content = ""
+					if os.path.exists(file_path):
+						with open(file_path, 'r') as f:
+							current_content = f.read()
+					
+					# Update if content differs
+					if current_content != page.content:
+						# Ensure directory exists
+						if settings.create_missing_folders:
+							os.makedirs(os.path.dirname(file_path), exist_ok=True)
+						
+						# Write updated content
+						with open(file_path, 'w') as f:
+							f.write(page.content)
+						updates.append(f"Synced '{page_config['title']}' to markdown")
+		
+		return {
+			"success": True,
+			"message": f"Synced {len(updates)} pages to markdown files",
+			"updates": updates
+		}
+		
+	except Exception as e:
 		return {"success": False, "error": str(e)}

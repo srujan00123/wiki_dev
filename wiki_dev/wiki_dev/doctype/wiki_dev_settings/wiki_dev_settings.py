@@ -119,7 +119,7 @@ class WikiDevSettings(Document):
 			with open(hooks_path, 'r') as f:
 				content = f.read()
 			
-			wiki_hook = 'wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings'
+			wiki_hook = 'wiki_dev.api.wiki_sync.sync_all_enabled_settings'
 			
 			# Check if hook already exists
 			if wiki_hook in content:
@@ -178,7 +178,7 @@ class WikiDevSettings(Document):
 			with open(hooks_path, 'r') as f:
 				content = f.read()
 			
-			wiki_hook = 'wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings'
+			wiki_hook = 'wiki_dev.api.wiki_sync.sync_all_enabled_settings'
 			
 			# Remove the wiki hook line and its comment
 			lines = content.split('\n')

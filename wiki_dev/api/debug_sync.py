@@ -47,7 +47,7 @@ def test_sync():
 				continue
 			
 			# Try to call the actual sync function
-			from wiki_dev.wiki_dev.api.wiki_sync import update_wiki_space_from_folder
+			from wiki_dev.api.wiki_sync import update_wiki_space_from_folder
 			result = update_wiki_space_from_folder(setting_data.name)
 			results.append({
 				"settings": setting_data.name,

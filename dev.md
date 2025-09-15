@@ -144,8 +144,8 @@ Wiki Page with /private/files/ → auto_process_wiki_page_files() → Move to pu
 
 ## Testing
 - Migration sync: `bench --site {site} migrate`
-- Manual sync: `bench --site {site} execute wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings`
-- Sidebar refresh: `bench --site {site} execute wiki_dev.wiki_dev.api.wiki_sync.refresh_wiki_space_sidebar --kwargs '{"settings_name": "WDS-00002"}'`
+- Manual sync: `bench --site {site} execute wiki_dev.api.wiki_sync.sync_all_enabled_settings`
+- Sidebar refresh: `bench --site {site} execute wiki_dev.api.wiki_sync.refresh_wiki_space_sidebar --kwargs '{"settings_name": "WDS-00002"}'`
 
 ## File Paths
 - All file paths in _config.json are relative to wiki space folder
@@ -207,7 +207,7 @@ else:
 
 **Manual Fix**: Run sync manually:
 ```bash
-bench --site {site} execute wiki_dev.wiki_dev.api.wiki_sync.update_wiki_space_from_folder --kwargs '{"settings_name": "WDS-XXXXX"}'
+bench --site {site} execute wiki_dev.api.wiki_sync.update_wiki_space_from_folder --kwargs '{"settings_name": "WDS-XXXXX"}'
 ```
 
 ### Duplicate Migration Hooks
@@ -217,7 +217,7 @@ bench --site {site} execute wiki_dev.wiki_dev.api.wiki_sync.update_wiki_space_fr
 ```python
 # Keep only in wiki_dev/hooks.py
 after_migrate = [
-    "wiki_dev.wiki_dev.api.wiki_sync.sync_all_enabled_settings"
+    "wiki_dev.api.wiki_sync.sync_all_enabled_settings"
 ]
 
 # Remove from other apps like emr_plus/hooks.py
